@@ -18,7 +18,7 @@
   See more at http://www.dsbird.org.uk
 */
 
-#include "owm_credentials.h"
+#include "own_credentials.h"
 #include <ArduinoJson.h>     // https://github.com/bblanchon/ArduinoJson
 #include <WiFi.h>            // Built-in
 #include "time.h"
@@ -44,16 +44,30 @@ enum alignmentType {LEFT, RIGHT, CENTER};
 
 // Connections for Lilygo TTGO T5 V2.3_2.13 from
 // https://github.com/lewisxhe/TTGO-EPaper-Series#board-pins
-static const uint8_t EPD_BUSY = 15;
-static const uint8_t EPD_CS   = 5;
-static const uint8_t EPD_RST  = 2; 
-static const uint8_t EPD_DC   = 22; //Data/Command
-static const uint8_t EPD_SCK  = 18;   //CLK on pinout?
-static const uint8_t EPD_MISO = -1; // Master-In Slave-Out not used, as no data from display
-static const uint8_t EPD_MOSI = 23;
+// DEV KIT1
+// static const uint8_t EPD_BUSY = 15;
+// static const uint8_t EPD_CS   = 5;
+// static const uint8_t EPD_RST  = 2; 
+// static const uint8_t EPD_DC   = 22; //Data/Command
+// static const uint8_t EPD_SCK  = 18;   //CLK on pinout?
+// static const uint8_t EPD_MISO = -1; // Master-In Slave-Out not used, as no data from display
+//static const uint8_t EPD_MOSI = 23;
+// C3 Super MINI
+static const uint8_t EPD_BUSY = 8;  // ⚠️ Este puede dar guerra al arrancar. Si te falla, cámbialo.
+static const uint8_t EPD_CS   = 7;
+static const uint8_t EPD_RST  = 6;
+static const uint8_t EPD_DC   = 4;
+static const uint8_t EPD_SCK  = 3;   // SPI Clock
+static const uint8_t EPD_MISO = -1;  // No se usa
+static const uint8_t EPD_MOSI = 2;   // SPI MOSI
 
-GxEPD2_3C<GxEPD2_213_Z98c, GxEPD2_213_Z98c::HEIGHT> display(GxEPD2_213_Z98c(/*CS=5*/ 5, /*DC=*/ 22, /*RST=*/ 2, /*BUSY=*/ 15)); 
+// Dev Kit V1
+// GxEPD2_3C<GxEPD2_213_Z98c, GxEPD2_213_Z98c::HEIGHT> display(GxEPD2_213_Z98c(/*CS=5*/ 5, /*DC=*/ 22, /*RST=*/ 2, /*BUSY=*/ 15)); 
+// C3 Super Mini
+//GxEPD2_3C<GxEPD2_213_Z98c, GxEPD2_213_Z98c::HEIGHT> display(GxEPD2_213_Z98c(/*CS=5*/ 7, /*DC=*/ 4, /*RST=*/ 6, /*BUSY=*/ 8)); 
 //GxEPD2_BW<GxEPD2_213_B74, GxEPD2_213_B74::HEIGHT> display(GxEPD2_213_B74(/*CS=D8*/ EPD_CS, /*DC=D3*/ EPD_DC, /*RST=D4*/ EPD_RST, /*BUSY=D2*/ EPD_BUSY));
+GxEPD2_3C<GxEPD2_213_Z98c, GxEPD2_213_Z98c::HEIGHT> display(GxEPD2_213_Z98c(/*CS=*/ EPD_CS, /*DC=*/ EPD_DC, /*RST=*/ EPD_RST, /*BUSY=*/ EPD_BUSY));
+
 //#WeAct 2.13 screen module, you need to change GxEPD2_213_B73 to GxEPD2_213_B74
 U8G2_FOR_ADAFRUIT_GFX u8g2Fonts;  // Select u8g2 font from here: https://github.com/olikraus/u8g2/wiki/fntlistall
 // Using fonts:
@@ -194,7 +208,26 @@ void Draw_Heading_Section() {
 void Draw_Main_Weather_Section() {
   DisplayWXicon(117, 40, WxConditions[0].Icon, SmallIcon);
   u8g2Fonts.setFont(u8g2_font_helvB14_tf);
-  drawString(3, 35, String(WxConditions[0].Temperature, 1) + "° / " + String(WxConditions[0].Humidity, 0) + "%", LEFT);
+  //drawString(3, 35, String(WxConditions[0].Temperature, 1) + "° / " + String(WxConditions[0].Humidity, 0) + "%", LEFT);
+  // Para usar el rojo si temperatura o humedad son muy altos
+  String temp_str = String(WxConditions[0].Temperature, 1) + "°";
+  String hum_str  = String(WxConditions[0].Humidity, 0) + "%";
+
+  // Condicionales para determinar el color
+  if (WxConditions[0].Temperature > 25.0) {
+    u8g2Fonts.setForegroundColor(GxEPD_RED);
+  } else {
+    u8g2Fonts.setForegroundColor(GxEPD_BLACK);
+  }
+  drawString(3, 35, temp_str, LEFT);
+
+  if (WxConditions[0].Humidity > 70.0) {
+    u8g2Fonts.setForegroundColor(GxEPD_RED);
+  } else {
+    u8g2Fonts.setForegroundColor(GxEPD_BLACK);
+  }
+  drawString(3 + 70, 35, hum_str, LEFT);
+
   u8g2Fonts.setFont(u8g2_font_helvB10_tf);
   //Squeeze in a small wind indication in the space we cannot quite squeeze a 3h prediction into
   DrawSmallWind(230, 75, WxConditions[0].Winddir, WxConditions[0].Windspeed);
@@ -398,7 +431,6 @@ uint8_t StartWiFi() {
   IPAddress dns(8, 8, 8, 8); // Google DNS
   WiFi.disconnect();
   WiFi.mode(WIFI_STA); // switch off AP
-  WiFi.setAutoConnect(true);
   WiFi.setAutoReconnect(true);
   WiFi.begin(ssid, password);
   unsigned long start = millis();
